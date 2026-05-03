@@ -1,423 +1,88 @@
-# Todo App - Implementation Roadmap
+# Tasks — Todo App
 
-## Project Overview
-A minimalist todo app with localStorage persistence, featuring a clean black-themed UI with sharp, modern aesthetics.
+> **Scope**: A minimalist todo app with localStorage persistence, featuring a clean black-themed UI with sharp, modern aesthetics. The app is built with TypeScript, React, and Vite — no external UI dependencies. Linting and formatting are handled by Biome. It covers foundation, state management, task creation, list rendering, UI polish, advanced features (counters, cross-tab sync, XSS handling), and final quality validation.
+> **Created**: 2026-05-02
 
----
+## Phase 1: State Management & Data Layer
 
-## Phase 1: Foundation & Core Structure
-**Goal:** Set up the project foundation with HTML structure and basic styling system.
+**Goal**: Deliver a working storage service backed by localStorage, with data validation and graceful error handling.
 
-### Technical Specs
-- **Project Structure:**
-  ```
-  /
-  ├── index.html
-  ├── styles.css
-  ├── app.js
-  └── README.md
-  ```
+### storage-service
 
-- **HTML Requirements:**
-  - Semantic HTML5 structure
-  - Main container with max-width constraint (600px)
-  - Input field with placeholder "Add a new task..."
-  - Empty task list container (ul/ol)
-  - No external CSS frameworks - pure CSS
+- **Title**: Implement localStorage storage service with task data model
+- **Description**: In `src/storage.ts`, implement a storage service with the following API: `getTasks(): Task[]`, `saveTasks(tasks: Task[]): void`, `addTask(text: string): Task`, `toggleTask(id: string): void`, `deleteTask(id: string): void`, `clearCompleted(): void`. The `Task` shape is `{ id: string (timestamp + random), text: string, completed: boolean, createdAt: number }`. Persist under the key `'todo-tasks'` as a JSON array. Wrap all localStorage calls in try/catch; fall back to an in-memory array on failure and log a console warning. Cap stored tasks at 1000 (performance guard). On load, validate the parsed array shape to avoid crashes on corrupted data. Sanitize task text to strip HTML tags (XSS prevention). Trim whitespace and reject empty strings before creating a task.
+- **Depends on**: —
+- **Rationale**: A clean data layer decouples UI rendering from persistence logic and prevents XSS and data-corruption bugs from propagating upward.
 
-- **CSS Design System:**
-  - Color Palette:
-    - Primary: `#000000` (black)
-    - Background: `#FFFFFF` (white)
-    - Surface: `#F5F5F5` (light gray for hover states)
-    - Text Primary: `#000000`
-    - Text Secondary: `#666666`
-    - Border: `#E0E0E0`
-    - Accent (checked): `#000000`
-  - Typography:
-    - Font: System UI / -apple-system / BlinkMacSystemFont / 'Segoe UI' / Roboto
-    - Input: 16px (prevents iOS zoom)
-    - Task text: 16px
-    - Sharp, clean letter-spacing
-  - Spacing:
-    - Container padding: 24px
-    - Task item padding: 16px vertical
-    - Gap between tasks: 0 (border separation)
-  - Visual Style:
-    - Sharp corners (no border-radius or max 2px)
-    - 1px solid borders
-    - No shadows - flat design
-    - Clean divider lines between items
+## Phase 2: Foundation & Core Structure
 
-- **Acceptance Criteria:**
-  - [ ] Static HTML renders correctly
-  - [ ] CSS loads and applies minimalist black theme
-  - [ ] Responsive layout works on mobile (320px+) and desktop
-  - [ ] Input field is focused on page load
+**Goal**: Deliver a static page with semantic HTML, the full CSS design system applied, and a focused input field — nothing interactive yet.
 
----
+### html-foundation
 
-## Phase 2: State Management & Data Layer
-**Goal:** Implement localStorage persistence and task data model.
-
-### Technical Specs
-
-- **Data Model:**
-  ```javascript
-  Task {
-    id: string (timestamp + random),
-    text: string,
-    completed: boolean,
-    createdAt: number (timestamp)
-  }
-  ```
-
-- **localStorage Schema:**
-  - Key: `'todo-tasks'`
-  - Value: JSON array of Task objects
-  - Max tasks: 1000 (performance guard)
-
-- **Storage Service API:**
-  ```javascript
-  // Core methods to implement
-  getTasks(): Task[]
-  saveTasks(tasks: Task[]): void
-  addTask(text: string): Task
-  toggleTask(id: string): void
-  deleteTask(id: string): void
-  clearCompleted(): void
-  ```
-
-- **Error Handling:**
-  - Try/catch around all localStorage operations
-  - Fallback to in-memory array if localStorage unavailable
-  - Console warning on storage errors (don't break UI)
-  - Handle quota exceeded errors gracefully
-
-- **Data Integrity:**
-  - Validate data structure on load (migration ready)
-  - Sanitize task text (XSS prevention - strip HTML tags)
-  - Trim whitespace from input
-  - Reject empty tasks
-
-- **Acceptance Criteria:**
-  - [ ] Tasks persist across page reloads
-  - [ ] localStorage quota errors handled gracefully
-  - [ ] Data validation prevents corrupted state
-  - [ ] Storage operations are atomic (all-or-nothing)
-
----
+- **Title**: Add semantic HTML structure and CSS design system
+- **Description**: In `src/App.tsx`, build the component tree: a `<main>` container capped at 600px, a text input with `placeholder="Add a new task..."` and `aria-label="New task"`, and an empty `<ul>` for the task list. In `src/styles.css`, implement the full design system: color palette (`#000000` primary, `#FFFFFF` background, `#F5F5F5` surface, `#E0E0E0` border, `#666666` text-secondary, `#999999` text-disabled), system-ui font stack at 16px, 24px container padding, 16px task item vertical padding, 1px solid borders, and sharp corners (no border-radius or max 2px). No external CSS frameworks. Auto-focus the input on page load via `useEffect` + `ref`. Layout must be responsive from 320px up.
+- **Depends on**: storage-service
+- **Rationale**: Every subsequent phase depends on the component skeleton and CSS tokens. Establishing the design system first prevents style drift across phases.
 
 ## Phase 3: Task Input & Creation
-**Goal:** Implement the input field with task creation functionality.
 
-### Technical Specs
+**Goal**: Deliver a fully wired input field that creates, validates, and persists tasks on Enter.
 
-- **Input Component:**
-  - Single text input, full width
-  - Placeholder: "Add a new task..."
-  - No submit button (Enter key only)
-  - Auto-focus on page load
-  - Character limit: 200 characters
+### task-input
 
-- **Interaction Specs:**
-  ```
-  On Enter (keyCode 13):
-    1. Trim input value
-    2. If empty, do nothing
-    3. If valid, create task
-    4. Clear input
-    5. Maintain focus
-    6. Add subtle animation feedback
-
-  On Escape (keyCode 27):
-    1. Clear input
-    2. Maintain focus
-  ```
-
-- **UX Details:**
-  - Disable input briefly during save (50ms) to prevent double-submit
-  - Show character count when > 150 chars (optional, minimalist)
-  - Visual feedback on task creation (subtle flash or border pulse)
-
-- **Accessibility:**
-  - Label for input (visually hidden if needed)
-  - aria-label: "New task"
-  - Keyboard-only navigation works
-
-- **Acceptance Criteria:**
-  - [ ] Pressing Enter creates a task
-  - [ ] Empty tasks are rejected (no creation)
-  - [ ] Input clears after successful creation
-  - [ ] Focus remains in input after creation
-  - [ ] 200 character limit enforced
-  - [ ] Works with screen readers
-
----
+- **Title**: Wire input field for task creation with keyboard handling
+- **Description**: In `src/components/TaskInput.tsx`, handle `keyDown` events. On **Enter**: trim the value, skip if empty, call `addTask()`, clear the input, keep focus, and call the `onTaskAdded` callback. On **Escape**: clear the input and keep focus. Enforce the 200-character `maxlength` attribute on the input. Disable the input for 50 ms after each save to prevent double-submit (via `useState` + `useEffect`). Show a character counter (inline, 14px gray) only when the user has typed more than 150 characters. Apply a bottom-border-only focus style (2px solid `#000000`) instead of the default outline ring. The input must carry `aria-label="New task"`.
+- **Depends on**: html-foundation
+- **Rationale**: The input is the primary creation surface. Getting it right — including the double-submit guard and accessibility label — before rendering the list keeps concerns separate.
 
 ## Phase 4: Task List Rendering
-**Goal:** Display tasks with check/uncheck functionality and delete capability.
 
-### Technical Specs
+**Goal**: Deliver a live task list with toggle, delete, hover states, empty state, and efficient React rendering.
 
-- **Task Item Structure:**
-  ```html
-  <li class="task-item" data-id="task-id">
-    <input type="checkbox" class="task-checkbox" />
-    <span class="task-text">Task content</span>
-    <button class="task-delete" aria-label="Delete task">×</button>
-  </li>
-  ```
+### task-list-render
 
-- **Rendering Logic:**
-  - Sort: Newest tasks at bottom (append mode)
-  - Re-render entire list on state change (simple approach, <1000 items)
-  - Use DocumentFragment for batch DOM updates
-  - Empty state: Show "No tasks yet" message (subtle, gray)
+- **Title**: Render task list with toggle and delete
+- **Description**: In `src/components/TaskList.tsx` and `src/components/TaskItem.tsx`, implement `renderTasks()` driven by a `tasks` prop. Each task renders as `<li className="task-item" data-id="...">` containing a native `<input type="checkbox" className="task-checkbox">`, a `<span className="task-text">`, and a `<button className="task-delete" aria-label="Delete task">×</button>`. Sort: newest tasks appended at the bottom (creation order). Active tasks: black text, normal weight. Completed tasks: `#999999` color, `text-decoration: line-through`, lighter font-weight. The checkbox must be custom-styled to the black theme (checked = black fill + white checkmark via CSS, unchecked = white fill + black border). The delete button has a 24×24px touch target; on desktop it is opacity 0.3 normally and 1 on hover; on mobile it is always visible. Clicking the task text also toggles the checkbox. When there are no tasks, show a centered "No tasks yet" message in `#999999` at 14px. Apply `#F5F5F5` background on row hover. Separate rows with a 1px solid `#E0E0E0` border.
+- **Depends on**: task-input
+- **Rationale**: Rendering is blocked on both the storage service (data) and the input handler (state mutations).
 
-- **Checkbox Behavior:**
-  - Native checkbox input (accessibility)
-  - Custom styled to match black theme
-  - Checked state: Black fill, white checkmark
-  - Unchecked state: White fill, black border
-  - Smooth transition animation (150ms)
-  - Clicking text also toggles checkbox
+## Phase 5: UI Polish & Animations
 
-- **Delete Functionality:**
-  - × button appears on hover (desktop) or always visible (mobile)
-  - Click to delete immediately (no confirmation for single task)
-  - Animation: Fade out + slide up before removal
+**Goal**: Deliver GPU-accelerated entry/exit animations, smooth checkbox transitions, and mobile-ready touch targets.
 
-- **Task States:**
-  - Active: Black text, normal weight
-  - Completed: Gray text (#999), strikethrough, lighter weight
-  - Hover: Light gray background (#F5F5F5)
+### ui-animations
 
-- **Visual Polish:**
-  - 1px solid border between tasks
-  - Sharp edges, no rounding
-  - Consistent 16px padding
-  - Delete button: 24px × 24px touch target
-
-- **Acceptance Criteria:**
-  - [ ] Tasks render in creation order
-  - [ ] Checkbox toggles completed state
-  - [ ] Completed tasks show strikethrough
-  - [ ] Delete button removes task
-  - [ ] Hover states work correctly
-  - [ ] Empty state displays when no tasks
-  - [ ] Animations are smooth (60fps)
-
----
-
-## Phase 5: UI Polish & Interactions
-**Goal:** Add animations, micro-interactions, and refine the visual experience.
-
-### Technical Specs
-
-- **Animations (CSS transitions):**
-  ```css
-  /* Task entry */
-  @keyframes slideIn {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  
-  /* Task exit */
-  @keyframes slideOut {
-    to { opacity: 0; transform: translateX(-100%); }
-  }
-  
-  /* Checkbox check */
-  transition: all 0.15s ease-out
-  ```
-
-- **Interactions:**
-  - Add task: Subtle slide-down animation
-  - Delete task: Slide-left + fade out (300ms)
-  - Toggle complete: Strikethrough animates (optional)
-  - Input focus: Subtle border color change to black
-
-- **Visual Refinements:**
-  - Checkbox: Custom SVG or pure CSS, 20px × 20px
-  - Delete button: Thin × character, opacity 0.3 → 1 on hover
-  - Input: Bottom border only, 2px black when focused
-  - No outline rings (use border color change instead)
-
-- **Responsive Design:**
-  - Mobile: Full width, touch-friendly (44px min touch targets)
-  - Tablet: Centered, max-width 600px
-  - Desktop: Centered, max-width 600px
-  - Font sizes scale slightly on mobile
-
-- **Dark Mode Preparation:**
-  - CSS variables for colors (optional future enhancement)
-  - Structure supports theme switching
-
-- **Performance:**
-  - Use transform and opacity for animations (GPU accelerated)
-  - will-change on animated elements
-  - Debounce rapid operations (if needed)
-
-- **Acceptance Criteria:**
-  - [ ] Animations run at 60fps
-  - [ ] Mobile touch targets are 44px minimum
-  - [ ] Visual hierarchy is clear
-  - [ ] No layout shift during animations
-  - [ ] Polished, premium feel
-
----
+- **Title**: Add CSS animations for task entry, exit, and checkbox transitions
+- **Description**: In `src/styles.css`, add a `@keyframes slideIn` animation (`from { opacity: 0; transform: translateY(-10px) }` → `to { opacity: 1; transform: translateY(0) }`) applied to newly added `.task-item` elements. Add a `@keyframes slideOut` animation (`to { opacity: 0; transform: translateX(-100%) }`) triggered before a task is removed from the DOM — hold removal until the 300 ms animation completes via a `useState` flag in `TaskItem`. Add `transition: all 0.15s ease-out` to checkboxes. Apply `will-change: transform, opacity` on animated elements. All touch targets (checkbox, delete button, task row) must be at least 44×44px on mobile. Ensure animations use only `transform` and `opacity` (GPU-accelerated, no layout thrashing). Add `@media (prefers-reduced-motion: reduce)` to disable all transitions and keyframe animations. Input focus style: 2px solid `#000000` bottom border, no outline ring. Responsive: font sizes scale slightly on mobile; container is full-width below 600px.
+- **Depends on**: task-list-render
+- **Rationale**: Animations run on top of a stable DOM — adding them before the list is complete would require rework. Reduced-motion support is a WCAG 2.1 AA requirement.
 
 ## Phase 6: Advanced Features & Edge Cases
-**Goal:** Add task management features and handle edge cases.
 
-### Technical Specs
+**Goal**: Deliver task counter, "Clear completed" bulk action, cross-tab sync, and full edge-case hardening.
 
-- **Task Counters:**
-  - Display: "X tasks remaining" (active count)
-  - Position: Below task list, left-aligned
-  - Style: Small text (14px), gray color
+### task-counter-clear
 
-- **Bulk Actions:**
-  - "Clear completed" button (appears only when completed tasks exist)
-  - Position: Below task list, right-aligned
-  - Style: Small text (14px), black, underline on hover
-  - Confirmation: None (immediate action)
+- **Title**: Add task counter and clear-completed bulk action
+- **Description**: In `src/components/TaskFooter.tsx`, add a footer row below the task list. Left side: `<span id="task-count">` showing "X tasks remaining" (active task count), styled at 14px, `#666666`. Right side: a `<button id="clear-completed">Clear completed</button>` visible only when `tasks.some(t => t.completed)` — 14px, black text, no background, underline on hover, no confirmation dialog. Wire `clearCompleted()` from the storage service to this button. Both elements share a flex container that disappears when the list is empty. Update both on every render cycle.
+- **Depends on**: ui-animations
+- **Rationale**: Counter and bulk-clear are standard todo-app features that require a stable rendering pipeline before they can be wired in cleanly.
 
-- **Task Editing (Optional Phase 6+):**
-  - Double-click to edit
-  - Enter to save, Escape to cancel
-  - Inline input replaces text
+### cross-tab-sync
 
-- **Edge Cases:**
-  - XSS: Sanitize all user input (strip <script> and HTML)
-  - localStorage full: Graceful degradation
-  - 1000+ tasks: Performance warning or pagination
-  - Special characters: Handle emojis, unicode correctly
-  - Browser back button: State persists (already handled)
-  - Multiple tabs: Sync across tabs (storage event listener)
+- **Title**: Sync task state across browser tabs via storage event
+- **Description**: In `src/hooks/useStorageSync.ts`, implement a custom hook that calls `window.addEventListener('storage', (e) => { if (e.key === 'todo-tasks') onSync(); })` and removes the listener on unmount. Use it in `App.tsx` to trigger a state refresh whenever another tab mutates `todo-tasks`. Verify that the state-reading function reads fresh data from `getTasks()` on each call (i.e., it does not close over a stale snapshot).
+- **Depends on**: task-counter-clear
+- **Rationale**: Without this listener, two tabs editing the same list will silently diverge and whichever tab saves last wins — a data-loss hazard.
 
-- **Cross-Tab Sync:**
-  ```javascript
-  window.addEventListener('storage', (e) => {
-    if (e.key === 'todo-tasks') {
-      reloadTasks();
-    }
-  });
-  ```
+## Phase 7: Accessibility & Quality
 
-- **Accessibility Enhancements:**
-  - ARIA live region for task updates
-  - Focus management after delete (move to next/previous)
-  - High contrast mode support
-  - Reduced motion media query support
+**Goal**: Ship a WCAG 2.1 AA–compliant, cross-browser, zero-console-error build under 20 KB total.
 
-- **Acceptance Criteria:**
-  - [ ] Task counter displays correctly
-  - [ ] Clear completed works and removes only completed
-  - [ ] Changes sync across browser tabs
-  - [ ] XSS attempts are sanitized
-  - [ ] localStorage errors handled gracefully
-  - [ ] Reduced motion preferences respected
+### accessibility-focus
 
----
-
-## Phase 7: Testing & Optimization
-**Goal:** Ensure quality, performance, and cross-browser compatibility.
-
-### Technical Specs
-
-- **Manual Testing Checklist:**
-  - [ ] Chrome, Firefox, Safari, Edge (latest 2 versions)
-  - [ ] iOS Safari (iPhone SE, iPhone Pro)
-  - [ ] Android Chrome
-  - [ ] Keyboard-only navigation
-  - [ ] Screen reader testing (VoiceOver, NVDA)
-
-- **Performance Metrics:**
-  - First Contentful Paint: < 1.5s
-  - Time to Interactive: < 2s
-  - Animation frame rate: 60fps
-  - localStorage operations: < 10ms
-
-- **Code Quality:**
-  - No console errors
-  - JSDoc comments for all functions
-  - Consistent code style
-  - No unused variables
-
-- **Bundle Size:**
-  - Target: < 20KB total (HTML + CSS + JS)
-  - No external dependencies
-  - Minified production build (optional)
-
-- **SEO (Minimal):**
-  - Meta viewport tag
-  - Semantic HTML
-  - Descriptive title
-
-- **Deployment:**
-  - Static hosting ready (GitHub Pages, Netlify, Vercel)
-  - No build step required
-  - Single HTML file option (inline CSS/JS) for ultimate portability
-
-- **Acceptance Criteria:**
-  - [ ] All manual tests pass
-  - [ ] Performance targets met
-  - [ ] No JavaScript errors in console
-  - [ ] Works offline (after first load)
-  - [ ] Deployed and accessible via URL
-
----
-
-## Implementation Order Summary
-
-1. **Phase 1:** Foundation - Get something on screen
-2. **Phase 2:** Storage - Make data persist
-3. **Phase 3:** Input - Allow creating tasks
-4. **Phase 4:** List - Display and basic actions
-5. **Phase 5:** Polish - Animations and refinement
-6. **Phase 6:** Features - Counters, clear completed, edge cases
-7. **Phase 7:** Ship - Test, optimize, deploy
-
----
-
-## Design References
-
-### Color Palette
-```
-Primary:      #000000
-Background:   #FFFFFF
-Surface:      #F5F5F5
-Border:       #E0E0E0
-Text:         #000000
-TextMuted:    #666666
-TextDisabled: #999999
-```
-
-### Typography Scale
-```
-Title:        24px, font-weight: 600
-Input:        16px, font-weight: 400
-Task:         16px, font-weight: 400
-TaskComplete: 16px, font-weight: 400, text-decoration: line-through
-Meta:         14px, font-weight: 400
-```
-
-### Spacing Scale
-```
-xs:  4px
-sm:  8px
-md:  16px
-lg:  24px
-xl:  32px
-```
-
----
-
-## Notes
-
-- Keep it simple: Resist adding features beyond these phases
-- Mobile-first: Design for touch, enhance for desktop
-- Performance: 60fps animations, instant feedback
-- Accessibility: WCAG 2.1 AA compliance target
+- **Title**: Add ARIA live region and focus management for task operations
+- **Description**: In `src/components/A11yAnnouncer.tsx`, render `<div id="a11y-announcer" aria-live="polite" aria-atomic="true" className="visually-hidden"></div>` (`.visually-hidden` uses the standard clip-path off-screen technique). In `App.tsx`, update the announcer text after each task creation ("Task added"), deletion ("Task deleted"), and toggle ("Task marked complete / incomplete"). After deleting a task, move focus to the next task's delete button; if none, move to the previous; if the list is empty, move focus back to the input. Verify keyboard-only navigation: Tab through input → tasks → footer actions, Enter/Space on checkboxes, Delete button reachable. Add `role="list"` to the `<ul>` and `role="listitem"` to each `<li>` for VoiceOver compatibility on Safari. Confirm the page title is descriptive (e.g., `<title>Todo</title>`) and a `<meta name="viewport">` tag is present.
+- **Depends on**: cross-tab-sync
+- **Rationale**: ARIA live regions and post-delete focus management are the last pieces needed for screen-reader users to operate the app without visual feedback. They require a complete component tree to target.

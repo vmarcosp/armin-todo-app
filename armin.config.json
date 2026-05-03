@@ -1,0 +1,11 @@
+{
+	"agent": "opencode",
+	"sensors": [
+		{ "name": "typecheck", "cmd": "pnpm exec tsc -b --noEmit" },
+		{ "name": "lint", "cmd": "pnpm exec biome check ." },
+		{ "name": "build", "cmd": "pnpm exec vite build" }
+	],
+	"maxSensorAttempts": 3,
+	"pollIntervalSeconds": 300,
+	"pollTimeoutHours": 24
+}
